@@ -87,8 +87,8 @@ if [ ! -z "$SECTION" ]; then
     fi
 
     ### Init repo & dockerimage loaded from INI
-    REPO={$repo}
-    DOCKER_IMAGE={$image}
+    REPO=${repo}
+    DOCKER_IMAGE=${image}
 fi
 
 

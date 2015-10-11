@@ -22,6 +22,9 @@ image = privateregistry.com:5000/service2
 ...
 ```
 
+## Build task
+All tasks are documented & marked in `job.sh`, you can remove or add more task as you want based on your build flow.
+
 ## Repository source code
 In pre-processing, the source code of repo must be clone to `dockerbuild` directory to prepare for add to docker image in `docker build` task.
 
@@ -37,4 +40,18 @@ In `dockerbuild` directory, there is a file called `startup.sh`. I used this scr
 ```bash
 #!/bin/bash
 /sbin/my_init
+```
+
+## Example:
+There are two ways to pass service config, 
+via `-s` to load from `job.ini`:
+
+```bash
+$ ./job.sh -s=tc-inventory
+```
+
+or using `-r`, `-i` options to custom config of service:
+
+```bash
+$ ./job.sh -r=git@bitbucket.org:service1.git -i=registry:5000/service1
 ```

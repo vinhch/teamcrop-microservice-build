@@ -2,6 +2,9 @@
 
 echo "RUNNING..."
 
+
+#####################################
+### DOWNLOAD REMOTE CONFIGURATION
 CONFIG_LOCAL_FILE="/var/www/private/config.yml"
 
 # Download environment config if environment passed
@@ -37,5 +40,17 @@ else
     fi
 fi
 
+
+#########################################
+# Replace environment COLLECTD_WRITEHTTP_HOST
+cp /etc/collectd/configs/collectd-config.conf.tpl /etc/collectd/collectd.conf.tpl
+envtpl /etc/collectd/collectd.conf.tpl
+
+
+## run supervisord
+supervisord
+
+
 # Call parent entrypoint (CMD)
 /sbin/my_init
+

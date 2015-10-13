@@ -55,3 +55,9 @@ or using `-r`, `-i` options to custom config of service:
 ```bash
 $ ./job.sh -r=git@bitbucket.org:service1.git -i=registry:5000/service1
 ```
+
+
+## Supervisord & Collectd
+The dockerfile and startup script come with install Supervisord and Collectd to collect system, network information and push to an predefined url (every 10s) in environment with name COLLECTD_WRITEHTTP_HOST, such as "docker run ... -e COLLECTD_WRITEHTTP_HOST=http://yourreceiveurl...
+
+

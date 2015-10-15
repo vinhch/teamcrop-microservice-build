@@ -30,20 +30,18 @@ REPO=""
 ### Docker image will push to update
 DOCKER_IMAGE=""
 
+### Folder contains all working directory
+WORKSPACE_DIR="workspace"
+
+### Suffix for each working directory
+WORKSPACE_DIR_SUFFIX=`date +"%Y-%m-%d-%H-%M-%S-%N"`
+
+
 ### Directory contains dockerfile and startup for image
 DOCKERBUILD_DIR="dockerbuild"
 
-### Directory will store repository source code
-REPO_DIR="${DOCKERBUILD_DIR}/www"
 
-### File list will be removed after process
-UNUSED_WWW_FILES=( \
-    "${REPO_DIR}/.git" \
-    "${REPO_DIR}/build.*" \
-    "${REPO_DIR}/composer.*" \
-    "${REPO_DIR}/README.md" \
-    "${REPO_DIR}/tests" \
-)
+
 
 ### Directory of bash script
 SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
@@ -51,40 +49,23 @@ SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
 ################################################################################
 ### Extract information from commandline argument
-for i in "$@"
-do
-case $i in
-    -s=*|--searchpath=*)
-    SECTION="${i#*=}"
-    ;;
-    -r=*|--searchpath=*)
-    REPO="${i#*=}"
-    ;;
-    -i=*|--searchpath=*)
-    DOCKER_IMAGE="${i#*=}"
-    ;;
-    --default)
-    DEFAULT=YES
-    ;;
-    *)
-            # unknown option
-    ;;
-esac
-done
+if [ "$#" -ne 1 ]
+then
+  echo "Usage: ./job.sh SECTION"
+  exit 1
+fi
+
+### Get section name on first command line argument
+SECTION=$1
+
 
 
 ################################################################################
-### If found section option (-s) in command,
 ### load INI file to find information about this section
 if [ ! -z "$SECTION" ]; then
 
     ### Parsing INI file to get pre-define repo & image path
     ini_parser "${SCRIPT_DIR}/${SECTION_FILE}" $SECTION
-
-    if [ -z "$repo" ]; then
-        echo "[ERROR] Can not find 'repo' in section [${SECTION}]. Check your .INI file for job define."
-        exit 1
-    fi
 
     ### Init repo & dockerimage loaded from INI
     REPO=${repo}
@@ -95,7 +76,7 @@ fi
 ################################################################################
 ### Check require REPO
 if [ -z "$REPO" ]; then
-        echo "[ERROR] Repository is required. Use option (-r), such as: ... -r=repourl ... or using predefined section with -s option."
+        echo "[ERROR] Repository URL can not be found in section [${SECTION}]. Please check your INI file."
         exit 1
 fi
 
@@ -103,7 +84,7 @@ fi
 ################################################################################
 ### Check require IMAGE
 if [ -z "$DOCKER_IMAGE" ]; then
-        echo "[ERROR] Docker image is required. Use option (-i), such as: ... -i=image ... or using predefined section with -s option."
+        echo "[ERROR] Docker image can not be found in section [${SECTION}]. Please check your INI file."
         exit 1
 fi
 
@@ -111,17 +92,43 @@ fi
 printf "*********************************************************************\n"
 printf "[*] START RUNNING BUILD TASK FROM [${SCRIPT_DIR}]"
 
+
+############################
+
+
 ################################################################################
-### Task 01: Remove current source code folder for get latest code from repo
-printf "\n[TASK] Removing existed [${REPO_DIR}] folder..."
-rm -rf "${SCRIPT_DIR}/${REPO_DIR}"
+### Task 01: Everything about config is ok, init working directory
+
+#Dynamic working directory for each build, this directory will created and remove after build
+WORKING_DIR="${WORKSPACE_DIR}/${SECTION}-${WORKSPACE_DIR_SUFFIX}"
+FULL_WORKING_DIR="${SCRIPT_DIR}/${WORKING_DIR}"
+
+printf "\n[TASK] Creating temporary [${FULL_WORKING_DIR}] directory for this build..."
+mkdir ${FULL_WORKING_DIR}
 printf "done."
+
+printf "\n[TASK] Copy [${DOCKERBUILD_DIR}] directory to working directory..."
+cp -R "${SCRIPT_DIR}/${DOCKERBUILD_DIR}" ${FULL_WORKING_DIR}
+printf "done."
+
+
+### Directory will store repository source code
+REPO_DIR="${FULL_WORKING_DIR}/${DOCKERBUILD_DIR}/www"
+
+### File list will be removed after process
+UNUSED_WWW_FILES=( \
+    "${REPO_DIR}/.git" \
+    "${REPO_DIR}/build.*" \
+    "${REPO_DIR}/composer.*" \
+    "${REPO_DIR}/README.md" \
+    "${REPO_DIR}/tests" \
+)
 
 
 ################################################################################
 ### Task 02: Clone code from repository
 printf "\n[TASK] Cloning from [${REPO}]...\n"
-git clone ${REPO} "${SCRIPT_DIR}/${REPO_DIR}"
+git clone ${REPO} "${REPO_DIR}"
 if [ $? -eq 0 ]; then
     printf ""
 else
@@ -133,7 +140,7 @@ fi
 ################################################################################
 ### Task 03: Update composer
 printf "\n[TASK] Update composer to get all Vendor\n"
-cd "${SCRIPT_DIR}/${REPO_DIR}"
+cd "${REPO_DIR}"
 
 ### Delete current Vendor
 printf "\nDeleting [Vendor] directory..."
@@ -150,7 +157,7 @@ composer update
 printf "\n[TASK] Delete un-used files from [${REPO_DIR}]:"
 for i in "${UNUSED_WWW_FILES[@]}"
 do
-    DELETED_FILE="${SCRIPT_DIR}/${i}"
+    DELETED_FILE="${REPO_DIR}/${i}"
     printf "\nDeleting [${DELETED_FILE}]..."
     rm -rf ${DELETED_FILE}
     printf "OK"
@@ -160,7 +167,7 @@ done
 ################################################################################
 ### Task 05: Strip comments and space from php files
 printf "\n[TASK] Remove whitespace and comments from all PHP files in [${REPO_DIR}]:\n"
-PHP_FILES=$(find "${SCRIPT_DIR}/${REPO_DIR}" -type f -name '*.php')
+PHP_FILES=$(find "${REPO_DIR}" -type f -name '*.phpdemo')
 for f in $PHP_FILES
 do
   printf "Processing $f file...\n"
@@ -180,7 +187,7 @@ done
 ################################################################################
 ### Task 06: Build new Docker image from
 printf "\n[TASK] Build Docker Image with name [${DOCKER_IMAGE}]:\n"
-cd "${SCRIPT_DIR}/${DOCKERBUILD_DIR}"
+cd "${FULL_WORKING_DIR}/${DOCKERBUILD_DIR}"
 docker build -t ${DOCKER_IMAGE} .
 
 
@@ -193,8 +200,8 @@ printf "\nPush image done."
 
 ################################################################################
 ### Task 08: Remove working file/directory
-printf "\n[TASK] Cleaning existed [${REPO_DIR}] folder..."
-rm -rf "${SCRIPT_DIR}/${REPO_DIR}"
+printf "\n[TASK] Cleaning working [${FULL_WORKING_DIR}] directory..."
+rm -rf "${FULL_WORKING_DIR}"
 printf "done."
 
 ################################################################################
